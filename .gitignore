@@ -1,3 +1,4 @@
 .envrc.local
 app/bin
 app/release
+tmp

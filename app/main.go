@@ -13,14 +13,14 @@ import (
 	"github.com/urfave/cli"
 )
 
-func publish(subject string, path string) {
-	clusterID := "test-cluster"
-	clientID := "go-watcher-new-movies"
-	URL := stan.DefaultNatsURL
+var clusterID string
+var clusterURL string
+var clientID = "go-watcher-new-movies"
 
-	sc, err := stan.Connect(clusterID, clientID, stan.NatsURL(URL))
+func publish(subject string, path string) {
+	sc, err := stan.Connect(clusterID, clientID, stan.NatsURL(clusterURL))
 	if err != nil {
-		log.Fatalf("Can't connect: %v.\nMake sure a NATS Streaming Server is running at: %s", err, URL)
+		log.Fatalf("Can't connect: %v.\nMake sure a NATS Streaming Server is running at: %s", err, clusterURL)
 	}
 	defer sc.Close()
 
@@ -67,9 +67,29 @@ func main() {
 	app.Usage = "Watch a bunch of directories and notify of change"
 	app.Version = "0.1.0"
 
+	app.Flags = []cli.Flag{
+		cli.StringFlag{
+			Name:        "cluster-id",
+			Usage:       "cluster ID",
+			EnvVar:      "CLUSTER_ID",
+			Destination: &clusterID,
+		},
+		cli.StringFlag{
+			Name:        "cluster-url",
+			Usage:       "cluster URL",
+			EnvVar:      "CLUSTER_URL",
+			Value:       stan.DefaultNatsURL,
+			Destination: &clusterURL,
+		},
+	}
+
 	app.Action = func(c *cli.Context) error {
 		if len(c.Args()) != 1 {
 			log.Fatal("Please specify a directory to watch")
+		}
+
+		if len(clusterID) == 0 {
+			log.Fatal("Please specify a cluster ID")
 		}
 
 		path := strings.TrimSpace(strings.TrimRight(c.Args()[0], "/"))
