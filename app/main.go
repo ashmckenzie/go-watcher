@@ -1,31 +1,71 @@
 package main
 
 import (
-  // "os"
-  "log"
+	"fmt"
+	"log"
+	"os"
 
-  // "github.com/urfave/cli"
-  "github.com/rjeczalik/notify"
+	"github.com/davecgh/go-spew/spew"
+	pushbullet "github.com/mitsuse/pushbullet-go"
+	"github.com/mitsuse/pushbullet-go/requests"
+	"github.com/rjeczalik/notify"
+	"github.com/urfave/cli"
 )
 
+func sendNote(apiKey string, title string, message string) {
+	pb := pushbullet.New(apiKey)
+
+	n := requests.NewNote()
+	n.Title = title
+	n.Body = message
+
+	if _, err := pb.PostPushesNote(n); err != nil {
+		fmt.Fprintf(os.Stderr, "error: %s\n", err)
+		return
+	}
+}
+
 func main() {
-  // cli.NewApp().Run(os.Args)
+	var title string
 
-  // Make the channel buffered to ensure no event is dropped. Notify will drop
-  // an event if the receiver is not able to keep up the sending pace.
-  c := make(chan notify.EventInfo, 1)
+	app := cli.NewApp()
+	app.Name = "watcher"
+	app.Usage = "Watch a bunch of directories and notify of change"
+	app.Version = "0.1.0"
 
-  // Set up a watchpoint listening for events within a directory tree rooted
-  // at current working directory. Dispatch remove events to c.
-  if err := notify.Watch("/tmp/...", c, notify.Create); err != nil {
-      log.Fatal(err)
-  }
+	app.Flags = []cli.Flag{
+		cli.StringFlag{
+			Name:        "title, t",
+			Usage:       "note title",
+			EnvVar:      "TITLE",
+			Destination: &title,
+		},
+	}
 
-  defer notify.Stop(c)
+	app.Action = func(c *cli.Context) error {
+		apiKey := os.Getenv("PUSHBULLET_API_KEY")
 
-  // Block until an event is received.
-  for {
-    ei := <-c
-    log.Println("Got event:", ei)
-  }
+		if len(apiKey) == 0 {
+			return cli.NewExitError("ERROR: API key is empty!", 1)
+		}
+
+		spew.Dump(c.Args())
+
+		eventChannel := make(chan notify.EventInfo, 1)
+
+		if err := notify.Watch("/tmp/...", eventChannel, notify.Create); err != nil {
+			log.Fatal(err)
+		}
+
+		defer notify.Stop(eventChannel)
+
+		for {
+			ei := <-eventChannel
+			log.Println("Got event:", ei)
+		}
+
+		// sendNote(apiKey, title, message)
+	}
+
+	app.Run(os.Args)
 }
