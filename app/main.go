@@ -13,9 +13,10 @@ import (
 	"github.com/urfave/cli"
 )
 
+var subject string
+var clientID string
 var clusterID string
 var clusterURL string
-var clientID = "go-watcher-new-movies"
 
 func publish(subject string, path string) {
 	sc, err := stan.Connect(clusterID, clientID, stan.NatsURL(clusterURL))
@@ -69,6 +70,19 @@ func main() {
 
 	app.Flags = []cli.Flag{
 		cli.StringFlag{
+			Name:        "subject",
+			Usage:       "subject",
+			EnvVar:      "SUBJECT",
+			Destination: &subject,
+		},
+		cli.StringFlag{
+			Name:        "client-id",
+			Usage:       "client ID",
+			EnvVar:      "CLIENT_ID",
+			Destination: &clientID,
+		},
+
+		cli.StringFlag{
 			Name:        "cluster-id",
 			Usage:       "cluster ID",
 			EnvVar:      "CLUSTER_ID",
@@ -86,6 +100,14 @@ func main() {
 	app.Action = func(c *cli.Context) error {
 		if len(c.Args()) != 1 {
 			log.Fatal("Please specify a directory to watch")
+		}
+
+		if len(subject) == 0 {
+			log.Fatal("Please specify a subject")
+		}
+
+		if len(clientID) == 0 {
+			log.Fatal("Please specify a client ID")
 		}
 
 		if len(clusterID) == 0 {
@@ -109,8 +131,8 @@ func main() {
 			ei := <-eventChannel
 			path := ei.Path()
 			if info, err := os.Stat(path); err == nil && !info.IsDir() {
-				log.Println("New movie:", path)
-				publish("new-movie", path)
+				log.Println(path)
+				publish(subject, path)
 			}
 		}
 	}
